@@ -9,6 +9,7 @@ A true WebGL 3D room explored by a robot car using the MaleCNS fruit-fly model. 
 - [Architecture and data contracts](docs/ARCHITECTURE.md)
 - [Build a new MaleCNS environment adapter](docs/BUILDING-NEW-ADAPTER.md)
 - [Coding-agent instructions](AGENTS.md)
+- [OpenCLI/X findings and neuron test plan](docs/TWITTER-FINDINGS.md)
 
 ```text
 3D room + furniture → six-face camera → simulated compound eye
