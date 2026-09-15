@@ -35,10 +35,16 @@ OBJECTS = [
     {"kind": "plant", "x": 6.8, "y": -7.5, "w": 1.5, "d": 1.5, "h": 2.4, "color": [46, 135, 70]},
  ]
 
-# Box Road: straight horizontal/diagonal/horizontal Z geometry.
-Z_SEGMENTS = [((-10.0, -16.0), (10.0, -16.0)),
-              ((10.0, -16.0), (-10.0, 16.0)),
-              ((-10.0, 16.0), (10.0, 16.0))]
+# Box Road: orthogonal route only—horizontal and vertical segments, no diagonals.
+Z_SEGMENTS = [((-10.0, -18.0), (10.0, -18.0)),
+              ((10.0, -18.0), (10.0, -10.0)),
+              ((10.0, -10.0), (-10.0, -10.0)),
+              ((-10.0, -10.0), (-10.0, -2.0)),
+              ((-10.0, -2.0), (10.0, -2.0)),
+              ((10.0, -2.0), (10.0, 6.0)),
+              ((10.0, 6.0), (-10.0, 6.0)),
+              ((-10.0, 6.0), (-10.0, 14.0)),
+              ((-10.0, 14.0), (0.0, 14.0))]
 for (ax, ay), (bx, by) in Z_SEGMENTS:
     dx, dy = bx - ax, by - ay
     length = math.hypot(dx, dy)
@@ -83,7 +89,7 @@ class World:
         self.reset()
 
     def reset(self):
-        self.x, self.y, self.heading = 0.0, -16.0, math.pi / 2
+        self.x, self.y, self.heading = -10.0, -18.0, 0.0
         self.speed = self.distance = 0.0
         self.collisions = self.wall_collisions = 0
         self.box_successes = 0
@@ -270,9 +276,9 @@ class World:
                 self.last_contact = "none"
                 # Evaluation only: crossing the marked Box Road finish line
                 # counts success; it never changes steering or throttle.
-                if previous_y < 19.0 <= self.y and abs(self.x) < 12.0:
+                if self.x > -0.5 and self.y > 13.5:
                     self.box_successes += 1
-                    self.x, self.y, self.heading = 0.0, -16.0, math.pi / 2
+                    self.x, self.y, self.heading = -10.0, -18.0, 0.0
                     self.speed = 0.0
 
             self.last = {

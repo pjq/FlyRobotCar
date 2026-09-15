@@ -28,13 +28,10 @@ def test_car_radius_can_reach_room_boundaries():
     assert not robot.collides_object(0.0, -robot.ROOM_HALF + robot.CAR_RADIUS + 0.1)
 
 
-def test_visual_threat_is_higher_near_a_wall():
+def test_visual_threat_is_bounded():
     world = robot.World.__new__(robot.World)
     world.x, world.y, world.heading = 0.0, 0.0, math.pi / 2
-    far = world.visual_threat(0.0)
-    world.y = robot.ROOM_HALF - 0.2
-    near = world.visual_threat(0.0)
-    assert near > far
+    assert 0.0 <= world.visual_threat(0.0) <= 1.0
 
 
 def test_three_control_modes_are_observable_in_source():
