@@ -23,7 +23,8 @@ from fly64.model import FlyModel  # noqa: E402
 
 PORT, DT, MAX_SPEED = 8775, 0.02, 8.0
 # Large room: world spans 48 x 48 units, leaving space for free exploration.
-ROOM_HALF, CAR_RADIUS = 24.0, 0.72
+ROOM_HALF, ROOM_HEIGHT, CAR_RADIUS = 24.0, 7.0, 0.72
+MAX_FLIGHT_Z = ROOM_HEIGHT - 1.2
 
 # Authoritative furniture layout used by physics, fly vision and the browser.
 OBJECTS = [
@@ -93,6 +94,7 @@ class World:
         self.x, self.y, self.heading = -10.0, -18.0, 0.0
         self.z = self.vertical_speed = 0.0
         self.flying = False
+        self.ceiling_contacts = 0
         self.flight_candidate_ticks = 0
         self.neural_loom_memory = 0.0
         self.neural_escape_memory = 0.0
@@ -278,6 +280,10 @@ class World:
                 self.vertical_speed += (lift * 5.0 - 2.4) * DT
                 self.vertical_speed *= .985
                 self.z += self.vertical_speed * DT
+                if self.z >= MAX_FLIGHT_Z:
+                    self.z = MAX_FLIGHT_Z
+                    self.vertical_speed = -1.0
+                    self.ceiling_contacts += 1
                 if self.z <= 0.0:
                     self.z = 0.0
                     self.vertical_speed = 0.0
@@ -322,7 +328,7 @@ class World:
                     self.speed = 0.0
 
             self.last = {
-                "x": round(self.x, 3), "y": round(self.y, 3), "z": round(self.z, 3), "flying": self.flying, "auto_takeoffs": self.auto_takeoffs, "heading": round(self.heading, 4),
+                "x": round(self.x, 3), "y": round(self.y, 3), "z": round(self.z, 3), "flying": self.flying, "auto_takeoffs": self.auto_takeoffs, "ceiling_contacts": self.ceiling_contacts, "heading": round(self.heading, 4),
                 "neural_loom_memory": round(self.neural_loom_memory, 2), "neural_escape_memory": round(self.neural_escape_memory, 2), "neural_flight_memory": round(self.neural_flight_memory, 2),
                 "speed": round(self.speed, 2), "raw_throttle": brain.y, "raw_steering": brain.x,
                 "throttle": round(control.throttle * 70), "steering": round(control.steering * 70),
