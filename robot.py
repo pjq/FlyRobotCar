@@ -210,7 +210,7 @@ class World:
         with self.lock: return dict(self.last)
 
 
-WORLD = World()
+WORLD: World | None = None
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -247,6 +247,7 @@ def loop():
 
 
 if __name__ == "__main__":
+    WORLD = World()
     threading.Thread(target=loop, daemon=True).start()
     print(f"Jianqing's FlyBobotCar: http://127.0.0.1:{PORT}/", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()
