@@ -207,7 +207,9 @@ class World:
                 for col in range(0, 128, 16): image[:, col:col+2] = np.clip(image[:, col:col+2].astype(int) - 12, 0, 255)
             else:
                 altitude = max(0.0, min(ROOM_HEIGHT, self.z)) / ROOM_HEIGHT
-                horizon = int(51 + (altitude - .5) * 10)
+                # Level camera: vertical placement is determined by real
+                # ground/object heights relative to the eye's z position.
+                horizon = 64
                 floor_tone = int(max(72, min(125, 112 - altitude * 24)))
                 image[:horizon] = [177, 187, 199]
                 image[horizon:] = [floor_tone, floor_tone - 8, floor_tone - 18]
@@ -235,9 +237,12 @@ class World:
                         visible.add(n)
                         center = int(64 + math.tan(bearing) * 64)
                         size = max(3, min(48, int(95 * max(item["w"], item["d"]) / (distance + 2))))
-                        perspective = max(.45, 1.0 - altitude * .45)
-                        bottom = min(123, int(horizon + 72 * perspective / max(distance, 1.5)))
-                        top_obj = max(5, bottom - int(size * item["h"] * perspective / 1.5))
+                        vertical_fov = math.radians(78.0)
+                        bottom_angle = math.atan2(-self.z, max(distance, 1.0))
+                        top_angle = math.atan2(item["h"] - self.z, max(distance, 1.0))
+                        bottom = max(0, min(127, int(64 - bottom_angle / vertical_fov * 128)))
+                        top_obj = max(0, min(127, int(64 - top_angle / vertical_fov * 128)))
+                        if top_obj > bottom: top_obj, bottom = bottom, top_obj
                         left, right = max(0, center-size//2), min(128, center+size//2)
                         image[top_obj:bottom, left:right] = item["color"]
                 # Floor tile perspective cues.
