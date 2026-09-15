@@ -67,6 +67,8 @@ class World:
         self.collisions = self.wall_collisions = 0
         self.last_collision_step = -100
         self.last_contact = "none"
+        self.escape_ticks = 0
+        self.escape_direction = 1.0
         self.last = {}
 
     def _load_neuron_groups(self):
@@ -171,7 +173,11 @@ class World:
             dna_rate = self.group_rate("DNa02", spikes) + self.group_rate("DNg13", spikes)
             control = AppliedControl(raw_throttle, raw_steering)
             source = "MaleCNS"
-            if self.neural_escape_enabled and (lc4_rate + lplc2_rate) > 8.0 and dnp_rate > 8.0:
+            if self.neural_escape_enabled and self.escape_ticks > 0:
+                control = AppliedControl(.30, self.escape_direction)
+                source = "MaleCNS tactile escape"
+                self.escape_ticks -= 1
+            elif self.neural_escape_enabled and (lc4_rate + lplc2_rate) > 8.0 and dnp_rate > 8.0:
                 # The escape command comes from DNp01/DNp10. Direction comes
                 # only from the neural steering readout, never room coordinates.
                 control = AppliedControl(max(raw_throttle * .45, .18), raw_steering if abs(raw_steering) > .08 else .55)
@@ -180,7 +186,7 @@ class World:
             self.speed += (target_speed - self.speed) * .12
             if self.speed < .08: self.speed = 0.0
             turn_rate = self.speed * .34
-            if source == "tactile escape reflex":
+            if source == "MaleCNS tactile escape":
                 turn_rate = max(turn_rate, 1.35)  # differential-drive pivot at contact
             self.heading = wrap_angle(self.heading + control.steering * turn_rate * DT)
             nx = self.x + math.cos(self.heading) * self.speed * DT
@@ -197,6 +203,12 @@ class World:
                 if self.model.step_count - self.last_collision_step >= 50:
                     self.collisions += 1; self.last_collision_step = self.model.step_count
                 self.speed = 0.0
+                if self.neural_escape_enabled and self.escape_ticks == 0:
+                    # Contact is represented as a short tactile escape phase.
+                    # Direction comes from the neural steering readout, not
+                    # from the furniture coordinates.
+                    self.escape_ticks = 80
+                    self.escape_direction = -1.0 if raw_steering >= 0 else 1.0
                 self.last_contact = contact
             else:
                 self.x, self.y = nx, ny
