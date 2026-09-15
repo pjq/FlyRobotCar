@@ -8,7 +8,7 @@ import robot
 
 
 def test_room_objects_have_collision_geometry():
-    assert len(robot.OBJECTS) == 13
+    assert len(robot.OBJECTS) >= 30
     for item in robot.OBJECTS:
         assert item["w"] > 0 and item["d"] > 0 and item["h"] > 0
         assert robot.collides_object(item["x"], item["y"]) is not None
