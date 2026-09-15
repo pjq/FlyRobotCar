@@ -9,6 +9,7 @@ import time
 from collections import deque
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import parse_qs, urlparse
 from pathlib import Path
 
 import numpy as np
@@ -72,6 +73,7 @@ class World:
         self.frame = np.zeros((HEIGHT, WIDTH, 3), np.uint8)
         self.paused = False
         self.neural_escape_enabled = True
+        self.stimulus_ticks = {}
         self.reset()
 
     def reset(self):
@@ -83,6 +85,7 @@ class World:
         self.last_contact = "none"
         self.escape_ticks = 0
         self.escape_direction = 1.0
+        self.stimulus_ticks.clear()
         self.throttle_history = deque(maxlen=8)
         self.steering_history = deque(maxlen=8)
         self.last = {}
@@ -183,6 +186,13 @@ class World:
         with self.lock:
             if self.paused: return
             self.frame, visible_objects = self.render_camera()
+            # Interactive, explicitly labeled optogenetic-style test pulse.
+            for name, ticks in list(self.stimulus_ticks.items()):
+                if ticks > 0:
+                    self.model.v[self.neuron_groups[name]] += 1.25
+                    self.stimulus_ticks[name] = ticks - 1
+                else:
+                    del self.stimulus_ticks[name]
             brain, spikes = self.model.step(self.frame, self.model.step_count * self.model.dt)
             # Motor readout follows the named MaleCNS populations. The
             # model's generic output is retained for comparison, but the car
@@ -264,6 +274,7 @@ class World:
                 "throttle": round(control.throttle * 70), "steering": round(control.steering * 70),
                 "motor_throttle_rate": round(raw_throttle * 50, 2), "motor_steering_rate": round(raw_steering * 50, 2),
                 "control_source": source, "neural_escape_enabled": self.neural_escape_enabled,
+                "stimulus": ",".join(sorted(self.stimulus_ticks)) or "none",
                 "left_threat": round(lc4_rate, 2), "right_threat": round(lplc2_rate, 2),
                 "lc4_rate": round(lc4_rate, 2), "lplc2_rate": round(lplc2_rate, 2),
                 "dnp01_rate": round(self.group_rate("DNp01", spikes), 2), "dnp10_rate": round(self.group_rate("DNp10", spikes), 2),
@@ -303,9 +314,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         with WORLD.lock:
-            if self.path == "/reset": WORLD.reset()
-            elif self.path == "/pause": WORLD.paused = not WORLD.paused
-            elif self.path == "/neural-escape": WORLD.neural_escape_enabled = not WORLD.neural_escape_enabled
+            parsed = urlparse(self.path)
+            if parsed.path == "/reset": WORLD.reset()
+            elif parsed.path == "/pause": WORLD.paused = not WORLD.paused
+            elif parsed.path == "/neural-escape": WORLD.neural_escape_enabled = not WORLD.neural_escape_enabled
+            elif parsed.path == "/stimulate":
+                name = parse_qs(parsed.query).get("group", [""])[0]
+                if name not in WORLD.neuron_groups: self.send_response(400); self.end_headers(); return
+                WORLD.stimulus_ticks[name] = 20  # 400 ms at 50 Hz
             else: self.send_response(404); self.end_headers(); return
         self.send_response(204); self.end_headers()
 

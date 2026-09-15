@@ -82,6 +82,8 @@ The tested neural populations are:
 
 The interface reports the raw brain output, named neuron-group rates, applied command, and active source (`MaleCNS` or `MaleCNS neural escape`). The live mapping is also drawn as a neural-path diagram: `LC4/LPLC2 → MaleCNS → DNp01/DNp10` for visual escape, `DNg100 → throttle`, and `DNa02/DNg13 → steering`. Furniture and walls only produce visual input and physical collision outcomes.
 
+The neural diagram also has explicit 400 ms test-pulse buttons for LC4, LPLC2, DNp01, DNg100, and DNa02. These are optogenetic-style experiment controls, not manual vehicle controls: they inject a labeled pulse into the selected named population and let the network produce the resulting car response.
+
 Use `scripts/benchmark.py` to compare raw MaleCNS against the neural escape readout. Use the `neural-escape` endpoint only to run an ablation/control comparison; it does not add a non-neural controller.
 
 The connectome is fixed and is not trained. The motor readout uses FlyModel's annotated DNg100/DNa02/DNg13 rolling activity, with a short causal smoothing window to avoid one-tick jitter from the small named populations. The sensor encoder, neuron dynamics, output decoder, and vehicle physics are engineered approximations.
