@@ -16,8 +16,8 @@ This project is adapted from the upstream [Fly64](https://github.com/ornata/fly)
 
 ```text
 3D room + furniture → six-face camera → simulated compound eye
-→ 166,700-neuron MaleCNS → motor readout + optional fly-style reflexes
-→ throttle/steering → 3D robot car
+→ 166,700-neuron MaleCNS → LC4/LPLC2/DNp01 neural escape readout
+→ DNg100/DNa02/DNg13 motor command → 3D robot car
 ```
 
 ## Requirements
@@ -70,15 +70,20 @@ Endpoints:
 
 ## Autonomous control
 
-The raw MaleCNS readout provides throttle and steering. The optional avoidance layer estimates left/right visual threat from approaching room geometry:
+The car is now controlled by neural outputs only. There is no room-coordinate steering, road-following, geometric threat override, tactile code, stuck recovery, or automatic recentering.
 
-- obstacle looming on the left → turn right and slow down
-- obstacle looming on the right → turn left and slow down
-- physical contact → short tactile escape pivot, then return to visual/MaleCNS control
+The tested neural populations are:
 
-The dashboard separately reports the raw brain output, applied command, left/right threat, and active control source (`MaleCNS`, `visual avoidance reflex`, or `tactile escape reflex`). There is no road-following or navigation target.
+- `DNg100` → throttle
+- `DNa02` / `DNg13` → steering
+- `LC4` / `LPLC2` → looming/visual danger candidates
+- `DNp01` / `DNp10` → neural escape candidates
 
-The connectome is fixed and is not trained. The sensor encoder, neuron dynamics, output decoder, visual/tactile reflexes, and vehicle physics are engineered approximations.
+The interface reports the raw brain output, named neuron-group rates, applied command, and active source (`MaleCNS` or `MaleCNS neural escape`). Furniture and walls only produce visual input and physical collision outcomes.
+
+Use `scripts/benchmark.py` to compare raw MaleCNS against the neural escape readout. Use the `neural-escape` endpoint only to run an ablation/control comparison; it does not add a non-neural controller.
+
+The connectome is fixed and is not trained. The sensor encoder, neuron dynamics, output decoder, and vehicle physics are engineered approximations.
 
 ## Extend or reuse
 

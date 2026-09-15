@@ -39,5 +39,5 @@ def test_visual_threat_is_higher_near_a_wall():
 
 def test_three_control_modes_are_observable_in_source():
     source = (ROOT / "robot.py").read_text()
-    for mode in ("MaleCNS", "visual avoidance reflex", "tactile escape reflex"):
+    for mode in ("MaleCNS", "MaleCNS neural escape", "LC4", "LPLC2", "DNp01", "DNp10"):
         assert mode in source

@@ -11,6 +11,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import numpy as np
+import pyarrow.feather as feather
 
 ROOT = Path(__file__).resolve().parent
 FLY_DIR = Path(os.environ.get("FLY64_DIR", ROOT.parent / "fly")).resolve()
@@ -54,9 +55,10 @@ class World:
     def __init__(self):
         self.lock = threading.RLock()
         self.model = FlyModel(FLY_DIR / ".cache" / "malecns")
+        self.neuron_groups = self._load_neuron_groups()
         self.frame = np.zeros((HEIGHT, WIDTH, 3), np.uint8)
         self.paused = False
-        self.avoidance_enabled = True
+        self.neural_escape_enabled = True
         self.reset()
 
     def reset(self):
@@ -65,9 +67,24 @@ class World:
         self.collisions = self.wall_collisions = 0
         self.last_collision_step = -100
         self.last_contact = "none"
-        self.escape_ticks = 0
-        self.escape_direction = 1.0
         self.last = {}
+
+    def _load_neuron_groups(self):
+        """Resolve named biological cell types to prepared model indices."""
+        cache = FLY_DIR / ".cache" / "malecns"
+        ids = np.load(cache / "model.npz", allow_pickle=False)["ids"]
+        table = feather.read_table(cache / "raw" / "annotations.feather", columns=["bodyId", "flywireType", "type"]).to_pandas()
+        labels = table["flywireType"].fillna(table["type"]).astype(str)
+        index = {int(body): i for i, body in enumerate(ids)}
+        groups = {}
+        for name in ("LC4", "LPLC2", "DNp01", "DNp10", "DNg100", "DNa02", "DNg13"):
+            bodies = table.loc[labels.eq(name), "bodyId"].astype(int)
+            groups[name] = np.asarray([index[b] for b in bodies if b in index], dtype=np.int32)
+        return groups
+
+    def group_rate(self, name: str, spikes: np.ndarray) -> float:
+        group = self.neuron_groups[name]
+        return float(np.isin(group, spikes).sum() / max(len(group), 1) / DT)
 
     def visual_threat(self, angle_offset: float) -> float:
         """Approximate a fly-like looming cue along one eye direction (0..1)."""
@@ -144,22 +161,21 @@ class World:
             brain, spikes = self.model.step(self.frame, self.model.step_count * self.model.dt)
             raw_throttle = max(0.0, brain.y / 70.0)
             raw_steering = max(-1.0, min(1.0, brain.x / 70.0))
-            left_threat, right_threat = self.visual_threat(.48), self.visual_threat(-.48)
-            threat = max(left_threat, right_threat)
+            # Neural-only escape experiment: geometry is not consulted for
+            # steering. We only read the named MaleCNS populations after the
+            # complete network has propagated the visual input.
+            lc4_rate = self.group_rate("LC4", spikes)
+            lplc2_rate = self.group_rate("LPLC2", spikes)
+            dnp_rate = self.group_rate("DNp01", spikes) + self.group_rate("DNp10", spikes)
+            dng_rate = self.group_rate("DNg100", spikes)
+            dna_rate = self.group_rate("DNa02", spikes) + self.group_rate("DNg13", spikes)
             control = AppliedControl(raw_throttle, raw_steering)
             source = "MaleCNS"
-            if self.avoidance_enabled and self.escape_ticks > 0:
-                control = AppliedControl(.24, self.escape_direction * .9)
-                source = "tactile escape reflex"
-                self.escape_ticks -= 1
-            elif self.avoidance_enabled and threat > .18:
-                # A looming object in the left eye turns the vehicle right, and
-                # vice versa. Keep a little motion so steering can take effect.
-                avoidance_turn = max(-1.0, min(1.0, (right_threat - left_threat) * 1.7))
-                if abs(avoidance_turn) < .18:
-                    avoidance_turn = .65 if raw_steering >= 0 else -.65
-                control = AppliedControl(max(.22, min(raw_throttle, .38)), avoidance_turn)
-                source = "visual avoidance reflex"
+            if self.neural_escape_enabled and (lc4_rate + lplc2_rate) > 8.0 and dnp_rate > 8.0:
+                # The escape command comes from DNp01/DNp10. Direction comes
+                # only from the neural steering readout, never room coordinates.
+                control = AppliedControl(max(raw_throttle * .45, .18), raw_steering if abs(raw_steering) > .08 else .55)
+                source = "MaleCNS neural escape"
             target_speed = control.throttle * MAX_SPEED
             self.speed += (target_speed - self.speed) * .12
             if self.speed < .08: self.speed = 0.0
@@ -180,24 +196,22 @@ class World:
             if contact:
                 if self.model.step_count - self.last_collision_step >= 50:
                     self.collisions += 1; self.last_collision_step = self.model.step_count
-                if self.avoidance_enabled and self.escape_ticks == 0:
-                    self.escape_ticks = 120
-                    self.escape_direction = -1.0 if left_threat >= right_threat else 1.0
                 self.speed = 0.0
                 self.last_contact = contact
             else:
                 self.x, self.y = nx, ny
                 self.distance += self.speed * DT
                 self.last_contact = "none"
-                if source == "tactile escape reflex":
-                    self.escape_ticks = 0
 
             self.last = {
                 "x": round(self.x, 3), "y": round(self.y, 3), "heading": round(self.heading, 4),
                 "speed": round(self.speed, 2), "raw_throttle": brain.y, "raw_steering": brain.x,
                 "throttle": round(control.throttle * 70), "steering": round(control.steering * 70),
-                "control_source": source, "avoidance_enabled": self.avoidance_enabled,
-                "left_threat": round(left_threat, 2), "right_threat": round(right_threat, 2),
+                "control_source": source, "neural_escape_enabled": self.neural_escape_enabled,
+                "left_threat": round(lc4_rate, 2), "right_threat": round(lplc2_rate, 2),
+                "lc4_rate": round(lc4_rate, 2), "lplc2_rate": round(lplc2_rate, 2),
+                "dnp01_rate": round(self.group_rate("DNp01", spikes), 2), "dnp10_rate": round(self.group_rate("DNp10", spikes), 2),
+                "dng100_rate": round(dng_rate, 2), "dna_rate": round(dna_rate, 2),
                 "assist": source != "MaleCNS", "safe_mode": False,
                 "distance": round(self.distance, 2), "collisions": self.collisions,
                 "wall_collisions": self.wall_collisions, "last_contact": self.last_contact,
@@ -231,7 +245,7 @@ class Handler(BaseHTTPRequestHandler):
         with WORLD.lock:
             if self.path == "/reset": WORLD.reset()
             elif self.path == "/pause": WORLD.paused = not WORLD.paused
-            elif self.path == "/avoidance": WORLD.avoidance_enabled = not WORLD.avoidance_enabled
+            elif self.path == "/neural-escape": WORLD.neural_escape_enabled = not WORLD.neural_escape_enabled
             else: self.send_response(404); self.end_headers(); return
         self.send_response(204); self.end_headers()
 

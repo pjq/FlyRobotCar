@@ -19,10 +19,10 @@ def post(path):
         pass
 
 
-def run(name, avoidance):
+def run(name, neural_escape):
     state = get("/state")
-    if bool(state.get("avoidance_enabled")) != avoidance:
-        post("/avoidance")
+    if bool(state.get("neural_escape_enabled")) != neural_escape:
+        post("/neural-escape")
     post("/reset")
     start = time.monotonic()
     samples = []
@@ -47,5 +47,5 @@ def run(name, avoidance):
 
 
 if __name__ == "__main__":
-    results = [run("raw MaleCNS", False), run("MaleCNS + visual/tactile reflex", True)]
+    results = [run("raw MaleCNS", False), run("MaleCNS + LC4/LPLC2 → DNp01/DNp10 neural escape", True)]
     print(json.dumps({"experiment": "room navigation", "results": results}, indent=2))

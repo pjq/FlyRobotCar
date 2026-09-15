@@ -25,7 +25,7 @@ It is intentionally explicit about which parts come from biological data and whi
                             ▼
 ┌──────────────────── control adapters ──────────────────┐
 │ DNg100 → throttle · DNa02/DNg13 → steering             │
-│ optional visual looming + tactile escape reflexes      │
+│ LC4/LPLC2 → DNp01/DNp10 neural escape readout         │
 └───────────────────────────┬─────────────────────────────┘
                             │ applied command
                             ▼
@@ -162,28 +162,21 @@ raw_throttle = max(0, brain.y / 70)
 raw_steering = clip(brain.x / 70, -1, 1)
 ```
 
-### Visual avoidance reflex
+### Neural escape readout
 
-`visual_threat()` casts left/right view directions into the authoritative room geometry. It estimates a normalized threat from walls and furniture.
+The current experiment does not use room geometry to choose a steering direction. After each full MaleCNS step, it observes named cell-type populations:
 
-When enabled and threat exceeds the threshold:
+- `LC4` and `LPLC2`: visual looming-path candidates;
+- `DNp01` and `DNp10`: escape-output candidates.
 
-- left threat produces a right turn;
-- right threat produces a left turn;
-- throttle is reduced;
-- a minimum throttle allows steering to take effect.
+When their measured activity passes the experiment threshold, the car applies a reduced-throttle escape command using the neural steering readout. The active source is reported as `MaleCNS neural escape`.
 
-### Tactile escape reflex
+This is an engineered readout/interface around the connectome, not a claim that the car has learned collision avoidance. Physical walls and furniture still stop the simulated car and record collisions, but they do not choose the action.
 
-If the car physically contacts an object, a temporary differential-drive pivot is activated. It ends as soon as the car achieves a collision-free movement.
-
-The UI always reports one of:
+The UI reports one of:
 
 - `MaleCNS`
-- `visual avoidance reflex`
-- `tactile escape reflex`
-
-These reflexes are engineered and must not be described as learned or emergent behavior from the connectome.
+- `MaleCNS neural escape`
 
 ## Vehicle physics
 
@@ -249,9 +242,9 @@ Resets vehicle pose and run counters.
 
 Toggles simulation pause.
 
-### `POST /avoidance`
+### `POST /neural-escape`
 
-Toggles visual and tactile avoidance reflexes. With avoidance disabled, controls are raw MaleCNS output.
+Toggles the `LC4/LPLC2 → DNp01/DNp10` neural escape readout for ablation/control comparisons. It does not enable a geometry-based safety controller.
 
 ## Truthful interpretation
 
@@ -269,8 +262,7 @@ Engineered:
 - LIF dynamics and constants;
 - throttle/steering decoder;
 - vehicle physics;
-- visual threat estimator;
-- tactile escape behavior;
+- named-neuron escape threshold and motor readout;
 - all UI and telemetry.
 
 The application is not evidence of consciousness, understanding, or a biologically complete brain upload.
