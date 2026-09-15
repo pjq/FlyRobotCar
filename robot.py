@@ -93,6 +93,8 @@ class World:
         self.x, self.y, self.heading = -10.0, -18.0, 0.0
         self.z = self.vertical_speed = 0.0
         self.flying = False
+        self.flight_candidate_ticks = 0
+        self.auto_takeoffs = 0
         self.speed = self.distance = 0.0
         self.collisions = self.wall_collisions = 0
         self.box_successes = 0
@@ -238,9 +240,18 @@ class World:
             dna_rate = left_turn + right_turn
             control = AppliedControl(raw_throttle, raw_steering)
             source = "MaleCNS"
-            if self.flight_enabled and not self.flying and dnp_rate > 8.0 and flight_rate > 8.0:
+            # Automatic takeoff: the Flight Test button only injects a
+            # stimulus; normal flight must come from the neural pathway.
+            looming_rate = lc4_rate + lplc2_rate
+            if not self.flying and looming_rate > 8.0 and dnp_rate > 8.0 and flight_rate > 8.0:
+                self.flight_candidate_ticks += 1
+            else:
+                self.flight_candidate_ticks = max(0, self.flight_candidate_ticks - 1)
+            if self.flight_enabled and not self.flying and self.flight_candidate_ticks >= 3:
                 self.flying = True
                 self.z = max(self.z, .3)
+                self.auto_takeoffs += 1
+                self.flight_candidate_ticks = 0
                 source = "MaleCNS neural takeoff"
             if self.neural_escape_enabled and self.escape_ticks > 0:
                 control = AppliedControl(.30, self.escape_direction)
@@ -303,7 +314,7 @@ class World:
                     self.speed = 0.0
 
             self.last = {
-                "x": round(self.x, 3), "y": round(self.y, 3), "z": round(self.z, 3), "flying": self.flying, "heading": round(self.heading, 4),
+                "x": round(self.x, 3), "y": round(self.y, 3), "z": round(self.z, 3), "flying": self.flying, "auto_takeoffs": self.auto_takeoffs, "heading": round(self.heading, 4),
                 "speed": round(self.speed, 2), "raw_throttle": brain.y, "raw_steering": brain.x,
                 "throttle": round(control.throttle * 70), "steering": round(control.steering * 70),
                 "motor_throttle_rate": round(raw_throttle * 50, 2), "motor_steering_rate": round(raw_steering * 50, 2),
