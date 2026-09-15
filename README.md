@@ -43,7 +43,7 @@ Open <http://127.0.0.1:8775/>.
 
 ## Room
 
-The bounded room is 48 × 48 world units and contains physical walls, furniture, tiled floor, a `Jianqing's FlyBobotCar` wall sign, and a blue **Box Road** challenge. Seven rectangular blocks form a repeated S/slalom pattern and a white finish line marks the end. Crossing it increments the Box Road success counter; the finish detector evaluates only and does not steer or rescue the car. The backend physics, fly-camera rendering, and Three.js scene use the same object layout.
+The bounded room is 48 × 48 world units and contains physical walls, furniture, tiled floor, a `Jianqing's FlyBobotCar` wall sign, and a blue **Z Road** challenge. Rectangular blocks form three straight segments—horizontal, diagonal, horizontal—and a white finish line marks the end. Crossing it increments the Z Road success counter; the finish detector evaluates only and does not steer or rescue the car. The backend physics, fly-camera rendering, and Three.js scene use the same object layout.
 
 ## Controls
 

@@ -35,16 +35,21 @@ OBJECTS = [
     {"kind": "plant", "x": 6.8, "y": -7.5, "w": 1.5, "d": 1.5, "h": 2.4, "color": [46, 135, 70]},
  ]
 
-# Box Road: two rows of blocks follow the same pronounced S centerline.
-for y in np.arange(-16.0, 16.1, 2.0):
-    center = 7.0 * math.sin((y + 2.0) / 4.5)
-    slope = (7.0 / 4.5) * math.cos((y + 2.0) / 4.5)
-    normal = np.asarray([1.0, -slope], dtype=float)
-    normal /= np.linalg.norm(normal)
-    for side in (-1.0, 1.0):
-        OBJECTS.append({"kind": "box", "x": float(center + side * normal[0] * 3.4),
-                        "y": float(y + side * normal[1] * 3.4), "w": 1.5, "d": 1.5,
-                        "h": 2.0, "color": [43, 112, 185]})
+# Box Road: straight horizontal/diagonal/horizontal Z geometry.
+Z_SEGMENTS = [((-10.0, -16.0), (10.0, -16.0)),
+              ((10.0, -16.0), (-10.0, 16.0)),
+              ((-10.0, 16.0), (10.0, 16.0))]
+for (ax, ay), (bx, by) in Z_SEGMENTS:
+    dx, dy = bx - ax, by - ay
+    length = math.hypot(dx, dy)
+    nx, ny = -dy / length, dx / length
+    for distance in np.arange(0.0, length + 0.1, 2.0):
+        t = distance / length
+        cx, cy = ax + dx * t, ay + dy * t
+        for side in (-1.0, 1.0):
+            OBJECTS.append({"kind": "box", "x": cx + side * nx * 3.4,
+                            "y": cy + side * ny * 3.4, "w": 1.5, "d": 1.5,
+                            "h": 2.0, "color": [43, 112, 185]})
 
 
 def wrap_angle(value: float) -> float:
@@ -78,7 +83,7 @@ class World:
         self.reset()
 
     def reset(self):
-        self.x, self.y, self.heading = 0.0, -20.0, math.pi / 2
+        self.x, self.y, self.heading = 0.0, -16.0, math.pi / 2
         self.speed = self.distance = 0.0
         self.collisions = self.wall_collisions = 0
         self.box_successes = 0
@@ -267,7 +272,7 @@ class World:
                 # counts success; it never changes steering or throttle.
                 if previous_y < 19.0 <= self.y and abs(self.x) < 12.0:
                     self.box_successes += 1
-                    self.x, self.y, self.heading = 0.0, -20.0, math.pi / 2
+                    self.x, self.y, self.heading = 0.0, -16.0, math.pi / 2
                     self.speed = 0.0
 
             self.last = {
