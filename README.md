@@ -1,8 +1,14 @@
 # Jianqing's FlyBobotCar
 
-A true WebGL 3D room explored by a robot car using the MaleCNS fruit-fly model.
+A true WebGL 3D room explored by a robot car using the MaleCNS fruit-fly model. It is both a runnable demonstration and a reference implementation for connecting MaleCNS to another simulated or physical environment.
 
 ![Jianqing's FlyBobotCar dashboard](docs/flyrobotcar.png)
+
+## Documentation
+
+- [Architecture and data contracts](docs/ARCHITECTURE.md)
+- [Build a new MaleCNS environment adapter](docs/BUILDING-NEW-ADAPTER.md)
+- [Coding-agent instructions](AGENTS.md)
 
 ```text
 3D room + furniture → six-face camera → simulated compound eye
@@ -43,6 +49,21 @@ The bounded room contains physical walls, a sofa, coffee table, dining table, bo
 - **Pause / Resume**: pause simulation
 - **Visual avoidance reflex**: toggle the collision-avoidance layer
 
+## Runtime architecture
+
+The Python process owns the authoritative room, vehicle physics, sensory rendering, MaleCNS stepping, and control decisions. The browser is a Three.js viewer that receives the same furniture list and current telemetry over HTTP.
+
+Endpoints:
+
+| Endpoint | Purpose |
+|---|---|
+| `GET /state` | Vehicle pose, raw and applied controls, threats, contacts, and model metrics |
+| `GET /vision` | Raw `256 × 128 × 3` RGB compound-eye preview |
+| `GET /objects` | Authoritative furniture definitions used by Three.js |
+| `POST /reset` | Reset vehicle pose and counters |
+| `POST /pause` | Pause or resume the simulation |
+| `POST /avoidance` | Enable or disable visual/tactile reflexes |
+
 ## Autonomous control
 
 The raw MaleCNS readout provides throttle and steering. The optional avoidance layer estimates left/right visual threat from approaching room geometry:
@@ -54,3 +75,21 @@ The raw MaleCNS readout provides throttle and steering. The optional avoidance l
 The dashboard separately reports the raw brain output, applied command, left/right threat, and active control source (`MaleCNS`, `visual avoidance reflex`, or `tactile escape reflex`). There is no road-following or navigation target.
 
 The connectome is fixed and is not trained. The sensor encoder, neuron dynamics, output decoder, visual/tactile reflexes, and vehicle physics are engineered approximations.
+
+## Extend or reuse
+
+The project is intentionally small: the environment adapter is contained in `robot.py`, and the viewer is a single `index.html`. To add furniture, extend `OBJECTS`; to connect another game or robot, preserve the observation → MaleCNS → action loop and replace the environment/actuator adapter.
+
+See [Building a New MaleCNS Environment Adapter](docs/BUILDING-NEW-ADAPTER.md) for a minimal loop, coordinate conventions, output mappings, experiment design, physical-robot precautions, and an agent completion checklist.
+
+## Verification
+
+```bash
+python3 -m py_compile robot.py
+./run.sh
+curl -fsS http://127.0.0.1:8775/state | jq
+curl -fsS http://127.0.0.1:8775/objects | jq
+curl -fsS http://127.0.0.1:8775/vision | wc -c
+```
+
+The vision endpoint should return exactly `98304` bytes.
