@@ -81,8 +81,8 @@ At each model step:
 
 1. The room camera produces the visual atlas.
 2. The complete MaleCNS model propagates spikes.
-3. DNg100 activity becomes throttle.
-4. Bilateral DNa02/DNg13 activity difference becomes steering.
+3. The annotated DNg100 rolling activity becomes throttle; a short causal window smooths the two-cell output without adding a non-neural policy.
+4. The annotated bilateral DNa02/DNg13 rolling activity becomes steering; the same causal smoothing prevents single-tick 0/25/50 Hz jumps.
 5. LC4/LPLC2 and DNp01/DNp10 rates are observed.
 6. A neural escape readout can reduce throttle and use the neural steering output.
 7. Furniture and walls only apply physical collision; they do not select a turn direction.

@@ -6,6 +6,7 @@ import os
 import sys
 import threading
 import time
+from collections import deque
 from dataclasses import dataclass
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -19,7 +20,7 @@ sys.path.insert(0, str(FLY_DIR))
 from fly64.bridge import HEIGHT, WIDTH  # noqa: E402
 from fly64.model import FlyModel  # noqa: E402
 
-PORT, DT, MAX_SPEED = 8775, 0.02, 6.0
+PORT, DT, MAX_SPEED = 8775, 0.02, 8.0
 # Large room: world spans 48 x 48 units, leaving space for free exploration.
 ROOM_HALF, CAR_RADIUS = 24.0, 0.72
 
@@ -82,6 +83,8 @@ class World:
         self.last_contact = "none"
         self.escape_ticks = 0
         self.escape_direction = 1.0
+        self.throttle_history = deque(maxlen=8)
+        self.steering_history = deque(maxlen=8)
         self.last = {}
 
     def _load_neuron_groups(self):
@@ -187,8 +190,16 @@ class World:
             dng_rate = self.group_rate("DNg100", spikes)
             left_turn = self.group_rate("DNa02_L", spikes) + self.group_rate("DNg13_L", spikes)
             right_turn = self.group_rate("DNa02_R", spikes) + self.group_rate("DNg13_R", spikes)
-            raw_throttle = max(0.0, min(1.0, dng_rate / 50.0))
-            raw_steering = max(-1.0, min(1.0, (right_turn - left_turn) / 50.0))
+            # Named motor populations are tiny (often two cells), so use a
+            # short causal rate window. This removes single-step 0/25/50 Hz
+            # jitter while keeping the command entirely neuron-derived.
+            # FlyModel's rolling readout is already built from the annotated
+            # DNg100 and bilateral DNa02/DNg13 pools; use it as the stable
+            # named-population motor signal rather than a one-tick spike.
+            self.throttle_history.append(max(0.0, min(1.0, brain.y / 70.0)))
+            self.steering_history.append(max(-1.0, min(1.0, brain.x / 70.0)))
+            raw_throttle = max(0.0, min(1.0, float(np.mean(self.throttle_history))))
+            raw_steering = max(-1.0, min(1.0, float(np.mean(self.steering_history))))
             # Neural-only escape experiment: geometry is not consulted for
             # steering. We only read the named MaleCNS populations after the
             # complete network has propagated the visual input.
@@ -251,6 +262,7 @@ class World:
                 "x": round(self.x, 3), "y": round(self.y, 3), "heading": round(self.heading, 4),
                 "speed": round(self.speed, 2), "raw_throttle": brain.y, "raw_steering": brain.x,
                 "throttle": round(control.throttle * 70), "steering": round(control.steering * 70),
+                "motor_throttle_rate": round(raw_throttle * 50, 2), "motor_steering_rate": round(raw_steering * 50, 2),
                 "control_source": source, "neural_escape_enabled": self.neural_escape_enabled,
                 "left_threat": round(lc4_rate, 2), "right_threat": round(lplc2_rate, 2),
                 "lc4_rate": round(lc4_rate, 2), "lplc2_rate": round(lplc2_rate, 2),

@@ -84,7 +84,7 @@ The interface reports the raw brain output, named neuron-group rates, applied co
 
 Use `scripts/benchmark.py` to compare raw MaleCNS against the neural escape readout. Use the `neural-escape` endpoint only to run an ablation/control comparison; it does not add a non-neural controller.
 
-The connectome is fixed and is not trained. The sensor encoder, neuron dynamics, output decoder, and vehicle physics are engineered approximations.
+The connectome is fixed and is not trained. The motor readout uses FlyModel's annotated DNg100/DNa02/DNg13 rolling activity, with a short causal smoothing window to avoid one-tick jitter from the small named populations. The sensor encoder, neuron dynamics, output decoder, and vehicle physics are engineered approximations.
 
 ## Extend or reuse
 
