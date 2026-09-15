@@ -80,9 +80,9 @@ The tested neural populations are:
 - `LC4` / `LPLC2` → looming/visual danger candidates
 - `DNp01` / `DNp10` → neural escape candidates
 
-The interface reports the raw brain output, named neuron-group rates, applied command, and active source (`MaleCNS` or `MaleCNS neural escape`). The live mapping is also drawn as a neural-path diagram: `LC4/LPLC2 → MaleCNS → DNp01/DNp10` for visual escape, `DNg100 → throttle`, and `DNa02/DNg13 → steering`. Furniture and walls only produce visual input and physical collision outcomes.
+The interface reports the raw brain output, named neuron-group rates, applied command, active source (`MaleCNS`, `MaleCNS neural escape`, or `MaleCNS neural takeoff`), altitude, and ground/flight state. The Flight Test button stimulates DNp01/DNp02/DNp04/DNp11 as an explicit flight experiment; altitude and gravity are modeled physics. The live mapping is also drawn as a neural-path diagram: `LC4/LPLC2 → MaleCNS → DNp01/DNp10` for visual escape, `DNg100 → throttle`, and `DNa02/DNg13 → steering`. Furniture and walls only produce visual input and physical collision outcomes.
 
-The neural diagram also has explicit 400 ms test-pulse buttons for LC4, LPLC2, DNp01, DNg100, and DNa02. These are optogenetic-style experiment controls, not manual vehicle controls: they inject a labeled pulse into the selected named population and let the network produce the resulting car response.
+The neural diagram also has explicit 400 ms test-pulse buttons for LC4, LPLC2, DNp01, DNg100, DNa02, and a Flight Test for DNp01/DNp02/DNp04/DNp11. These are optogenetic-style experiment controls, not manual vehicle controls: they inject a labeled pulse into the selected named population and let the network produce the resulting car response.
 
 Use `scripts/benchmark.py` to compare raw MaleCNS against the neural escape readout. Use the `neural-escape` endpoint only to run an ablation/control comparison; it does not add a non-neural controller.
 

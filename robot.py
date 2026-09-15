@@ -83,6 +83,7 @@ class World:
         self.neuron_groups = self._load_neuron_groups()
         self.frame = np.zeros((HEIGHT, WIDTH, 3), np.uint8)
         self.paused = False
+        self.flight_enabled = True
         self.neural_escape_enabled = True
         self.stimulus_ticks = {}
         self.events = []
@@ -90,6 +91,8 @@ class World:
 
     def reset(self):
         self.x, self.y, self.heading = -10.0, -18.0, 0.0
+        self.z = self.vertical_speed = 0.0
+        self.flying = False
         self.speed = self.distance = 0.0
         self.collisions = self.wall_collisions = 0
         self.box_successes = 0
@@ -111,7 +114,7 @@ class World:
         labels = table["flywireType"].fillna(table["type"]).astype(str)
         index = {int(body): i for i, body in enumerate(ids)}
         groups = {}
-        for name in ("LC4", "LPLC2", "DNp01", "DNp10", "DNg100", "DNa02", "DNg13"):
+        for name in ("LC4", "LPLC2", "DNp01", "DNp10", "DNp02", "DNp04", "DNp11", "DNg100", "DNa02", "DNg13"):
             selected = table.loc[labels.eq(name)].copy()
             bodies = selected["bodyId"].astype(int)
             groups[name] = np.asarray([index[b] for b in bodies if b in index], dtype=np.int32)
@@ -228,10 +231,17 @@ class World:
             # complete network has propagated the visual input.
             lc4_rate = self.group_rate("LC4", spikes)
             lplc2_rate = self.group_rate("LPLC2", spikes)
-            dnp_rate = self.group_rate("DNp01", spikes) + self.group_rate("DNp10", spikes)
+            dnp01_rate = self.group_rate("DNp01", spikes)
+            dnp10_rate = self.group_rate("DNp10", spikes)
+            dnp_rate = dnp01_rate + dnp10_rate
+            flight_rate = (self.group_rate("DNp02", spikes) + self.group_rate("DNp04", spikes) + self.group_rate("DNp11", spikes))
             dna_rate = left_turn + right_turn
             control = AppliedControl(raw_throttle, raw_steering)
             source = "MaleCNS"
+            if self.flight_enabled and not self.flying and dnp_rate > 8.0 and flight_rate > 8.0:
+                self.flying = True
+                self.z = max(self.z, .3)
+                source = "MaleCNS neural takeoff"
             if self.neural_escape_enabled and self.escape_ticks > 0:
                 control = AppliedControl(.30, self.escape_direction)
                 source = "MaleCNS tactile escape"
@@ -242,6 +252,17 @@ class World:
                 control = AppliedControl(raw_throttle * .45, raw_steering)
                 source = "MaleCNS neural escape"
             target_speed = control.throttle * MAX_SPEED
+            if self.flying:
+                # Modeled flight dynamics; neural groups choose takeoff and
+                # flight drive, while gravity/drag are explicit physics.
+                lift = max(-1.0, min(1.0, flight_rate / 50.0 - .25))
+                self.vertical_speed += (lift * 5.0 - 2.4) * DT
+                self.vertical_speed *= .985
+                self.z += self.vertical_speed * DT
+                if self.z <= 0.0:
+                    self.z = 0.0
+                    self.vertical_speed = 0.0
+                    self.flying = False
             self.speed += (target_speed - self.speed) * .12
             if self.speed < .08: self.speed = 0.0
             turn_rate = self.speed * .34
@@ -282,7 +303,7 @@ class World:
                     self.speed = 0.0
 
             self.last = {
-                "x": round(self.x, 3), "y": round(self.y, 3), "heading": round(self.heading, 4),
+                "x": round(self.x, 3), "y": round(self.y, 3), "z": round(self.z, 3), "flying": self.flying, "heading": round(self.heading, 4),
                 "speed": round(self.speed, 2), "raw_throttle": brain.y, "raw_steering": brain.x,
                 "throttle": round(control.throttle * 70), "steering": round(control.steering * 70),
                 "motor_throttle_rate": round(raw_throttle * 50, 2), "motor_steering_rate": round(raw_steering * 50, 2),
@@ -291,7 +312,7 @@ class World:
                 "events": self.events[-8:],
                 "left_threat": round(lc4_rate, 2), "right_threat": round(lplc2_rate, 2),
                 "lc4_rate": round(lc4_rate, 2), "lplc2_rate": round(lplc2_rate, 2),
-                "dnp01_rate": round(self.group_rate("DNp01", spikes), 2), "dnp10_rate": round(self.group_rate("DNp10", spikes), 2),
+                "dnp01_rate": round(dnp01_rate, 2), "dnp10_rate": round(dnp10_rate, 2), "flight_rate": round(flight_rate, 2),
                 "dng100_rate": round(dng_rate, 2), "dna_rate": round(dna_rate, 2),
                 "dng100_l_rate": round(self.group_rate("DNg100_L", spikes), 2), "dng100_r_rate": round(self.group_rate("DNg100_R", spikes), 2),
                 "dna02_l_rate": round(self.group_rate("DNa02_L", spikes), 2), "dng13_l_rate": round(self.group_rate("DNg13_L", spikes), 2),
@@ -332,6 +353,10 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/reset": WORLD.reset()
             elif parsed.path == "/pause": WORLD.paused = not WORLD.paused
             elif parsed.path == "/neural-escape": WORLD.neural_escape_enabled = not WORLD.neural_escape_enabled
+            elif parsed.path == "/flight-test":
+                for name in ("DNp01", "DNp02", "DNp04", "DNp11"):
+                    WORLD.stimulus_ticks[name] = 20
+                WORLD.events.append({"time": round(time.time(), 2), "type": "flight-test", "group": "DNp01+DNp02+DNp04+DNp11"})
             elif parsed.path == "/stimulate":
                 name = parse_qs(parsed.query).get("group", [""])[0]
                 if name not in WORLD.neuron_groups: self.send_response(400); self.end_headers(); return
