@@ -168,8 +168,15 @@ class World:
         visible = set()
         for face in range(6):
             image = np.empty((128, 128, 3), np.uint8)
-            if face == 4: image[:] = [190, 198, 207]  # ceiling
-            elif face == 5: image[:] = [112, 104, 94]  # floor
+            if face in (4, 5):
+                # Up/down faces are real sensor inputs, not blank placeholders.
+                # Their shading changes with altitude: ceiling gets closer as z
+                # rises, floor gets farther away, making flight visible to the eye model.
+                distance = (ROOM_HEIGHT - self.z) if face == 4 else max(self.z, .1)
+                base = int(max(42, min(190, 72 + distance * 7)))
+                image[:] = [base, base + 5, base + 12] if face == 4 else [base, base - 5, base - 12]
+                for row in range(0, 128, 16): image[row:row+2] = np.clip(image[row:row+2].astype(int) - 18, 0, 255)
+                for col in range(0, 128, 16): image[:, col:col+2] = np.clip(image[:, col:col+2].astype(int) - 12, 0, 255)
             else:
                 horizon = 51
                 image[:horizon] = [177, 187, 199]
