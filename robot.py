@@ -20,7 +20,8 @@ from fly64.bridge import HEIGHT, WIDTH  # noqa: E402
 from fly64.model import FlyModel  # noqa: E402
 
 PORT, DT, MAX_SPEED = 8775, 0.02, 6.0
-ROOM_HALF, CAR_RADIUS = 14.5, 0.72
+# Large room: world spans 48 x 48 units, leaving space for free exploration.
+ROOM_HALF, CAR_RADIUS = 24.0, 0.72
 
 # Authoritative furniture layout used by physics, fly vision and the browser.
 OBJECTS = [

@@ -42,7 +42,7 @@ Open <http://127.0.0.1:8775/>.
 
 ## Room
 
-The bounded room contains physical walls, a sofa, coffee table, dining table, bookshelf, armchair, plant, tiled floor, and a `Jianqing's FlyBobotCar` wall sign. The backend physics, fly-camera rendering, and Three.js scene use the same object layout.
+The bounded room is 48 × 48 world units and contains physical walls, a sofa, coffee table, dining table, bookshelf, armchair, plant, tiled floor, and a `Jianqing's FlyBobotCar` wall sign. The backend physics, fly-camera rendering, and Three.js scene use the same object layout.
 
 ## Controls
 
@@ -79,7 +79,7 @@ The tested neural populations are:
 - `LC4` / `LPLC2` → looming/visual danger candidates
 - `DNp01` / `DNp10` → neural escape candidates
 
-The interface reports the raw brain output, named neuron-group rates, applied command, and active source (`MaleCNS` or `MaleCNS neural escape`). Furniture and walls only produce visual input and physical collision outcomes.
+The interface reports the raw brain output, named neuron-group rates, applied command, and active source (`MaleCNS` or `MaleCNS neural escape`). The live mapping is also drawn as a neural-path diagram: `LC4/LPLC2 → MaleCNS → DNp01/DNp10` for visual escape, `DNg100 → throttle`, and `DNa02/DNg13 → steering`. Furniture and walls only produce visual input and physical collision outcomes.
 
 Use `scripts/benchmark.py` to compare raw MaleCNS against the neural escape readout. Use the `neural-escape` endpoint only to run an ablation/control comparison; it does not add a non-neural controller.
 
