@@ -178,9 +178,11 @@ class World:
                 for row in range(0, 128, 16): image[row:row+2] = np.clip(image[row:row+2].astype(int) - 18, 0, 255)
                 for col in range(0, 128, 16): image[:, col:col+2] = np.clip(image[:, col:col+2].astype(int) - 12, 0, 255)
             else:
-                horizon = 51
+                altitude = max(0.0, min(ROOM_HEIGHT, self.z)) / ROOM_HEIGHT
+                horizon = int(51 + (altitude - .5) * 10)
+                floor_tone = int(max(72, min(125, 112 - altitude * 24)))
                 image[:horizon] = [177, 187, 199]
-                image[horizon:] = [112, 104, 94]
+                image[horizon:] = [floor_tone, floor_tone - 8, floor_tone - 18]
                 angle = self.heading + face_angles[face]
                 dx, dy = math.cos(angle), math.sin(angle)
                 hits = []
@@ -205,8 +207,9 @@ class World:
                         visible.add(n)
                         center = int(64 + math.tan(bearing) * 64)
                         size = max(3, min(48, int(95 * max(item["w"], item["d"]) / (distance + 2))))
-                        bottom = min(123, int(horizon + 72 / max(distance, 1.5)))
-                        top_obj = max(5, bottom - int(size * item["h"] / 1.5))
+                        perspective = max(.45, 1.0 - altitude * .45)
+                        bottom = min(123, int(horizon + 72 * perspective / max(distance, 1.5)))
+                        top_obj = max(5, bottom - int(size * item["h"] * perspective / 1.5))
                         left, right = max(0, center-size//2), min(128, center+size//2)
                         image[top_obj:bottom, left:right] = item["color"]
                 # Floor tile perspective cues.
