@@ -74,6 +74,7 @@ class World:
         self.paused = False
         self.neural_escape_enabled = True
         self.stimulus_ticks = {}
+        self.events = []
         self.reset()
 
     def reset(self):
@@ -86,6 +87,7 @@ class World:
         self.escape_ticks = 0
         self.escape_direction = 1.0
         self.stimulus_ticks.clear()
+        self.events = []
         self.throttle_history = deque(maxlen=8)
         self.steering_history = deque(maxlen=8)
         self.last = {}
@@ -275,6 +277,7 @@ class World:
                 "motor_throttle_rate": round(raw_throttle * 50, 2), "motor_steering_rate": round(raw_steering * 50, 2),
                 "control_source": source, "neural_escape_enabled": self.neural_escape_enabled,
                 "stimulus": ",".join(sorted(self.stimulus_ticks)) or "none",
+                "events": self.events[-8:],
                 "left_threat": round(lc4_rate, 2), "right_threat": round(lplc2_rate, 2),
                 "lc4_rate": round(lc4_rate, 2), "lplc2_rate": round(lplc2_rate, 2),
                 "dnp01_rate": round(self.group_rate("DNp01", spikes), 2), "dnp10_rate": round(self.group_rate("DNp10", spikes), 2),
@@ -322,6 +325,11 @@ class Handler(BaseHTTPRequestHandler):
                 name = parse_qs(parsed.query).get("group", [""])[0]
                 if name not in WORLD.neuron_groups: self.send_response(400); self.end_headers(); return
                 WORLD.stimulus_ticks[name] = 20  # 400 ms at 50 Hz
+                WORLD.events.append({"time": round(time.time(), 2), "type": "stimulus", "group": name})
+            elif parsed.path == "/escape-test":
+                for name in ("LC4", "LPLC2"):
+                    WORLD.stimulus_ticks[name] = 20
+                WORLD.events.append({"time": round(time.time(), 2), "type": "escape-test", "group": "LC4+LPLC2"})
             else: self.send_response(404); self.end_headers(); return
         self.send_response(204); self.end_headers()
 
