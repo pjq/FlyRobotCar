@@ -94,6 +94,9 @@ class World:
         self.z = self.vertical_speed = 0.0
         self.flying = False
         self.flight_candidate_ticks = 0
+        self.neural_loom_memory = 0.0
+        self.neural_escape_memory = 0.0
+        self.neural_flight_memory = 0.0
         self.auto_takeoffs = 0
         self.speed = self.distance = 0.0
         self.collisions = self.wall_collisions = 0
@@ -237,13 +240,18 @@ class World:
             dnp10_rate = self.group_rate("DNp10", spikes)
             dnp_rate = dnp01_rate + dnp10_rate
             flight_rate = (self.group_rate("DNp02", spikes) + self.group_rate("DNp04", spikes) + self.group_rate("DNp11", spikes))
+            # Short causal memories model neural persistence at 50 Hz; this
+            # avoids requiring three tiny populations to spike on one exact tick.
+            self.neural_loom_memory = .92 * self.neural_loom_memory + .08 * (lc4_rate + lplc2_rate)
+            self.neural_escape_memory = .92 * self.neural_escape_memory + .08 * dnp_rate
+            self.neural_flight_memory = .92 * self.neural_flight_memory + .08 * flight_rate
             dna_rate = left_turn + right_turn
             control = AppliedControl(raw_throttle, raw_steering)
             source = "MaleCNS"
             # Automatic takeoff: the Flight Test button only injects a
             # stimulus; normal flight must come from the neural pathway.
             looming_rate = lc4_rate + lplc2_rate
-            if not self.flying and looming_rate > 8.0 and dnp_rate > 8.0 and flight_rate > 8.0:
+            if not self.flying and self.neural_loom_memory > 4.0 and self.neural_escape_memory > 2.0 and self.neural_flight_memory > 2.0:
                 self.flight_candidate_ticks += 1
             else:
                 self.flight_candidate_ticks = max(0, self.flight_candidate_ticks - 1)
@@ -266,7 +274,7 @@ class World:
             if self.flying:
                 # Modeled flight dynamics; neural groups choose takeoff and
                 # flight drive, while gravity/drag are explicit physics.
-                lift = max(-1.0, min(1.0, flight_rate / 25.0 - .25))
+                lift = max(-1.0, min(1.0, self.neural_flight_memory / 10.0 - .2))
                 self.vertical_speed += (lift * 5.0 - 2.4) * DT
                 self.vertical_speed *= .985
                 self.z += self.vertical_speed * DT
@@ -315,6 +323,7 @@ class World:
 
             self.last = {
                 "x": round(self.x, 3), "y": round(self.y, 3), "z": round(self.z, 3), "flying": self.flying, "auto_takeoffs": self.auto_takeoffs, "heading": round(self.heading, 4),
+                "neural_loom_memory": round(self.neural_loom_memory, 2), "neural_escape_memory": round(self.neural_escape_memory, 2), "neural_flight_memory": round(self.neural_flight_memory, 2),
                 "speed": round(self.speed, 2), "raw_throttle": brain.y, "raw_steering": brain.x,
                 "throttle": round(control.throttle * 70), "steering": round(control.steering * 70),
                 "motor_throttle_rate": round(raw_throttle * 50, 2), "motor_steering_rate": round(raw_steering * 50, 2),
