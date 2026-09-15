@@ -71,6 +71,28 @@ def collides_object(x: float, y: float):
     return None
 
 
+class StereoRetina:
+    """Use independent camera atlases for left/right visual populations."""
+    def __init__(self, base, eye_mask):
+        self.base = base
+        self.eye_mask = eye_mask
+
+    def sample(self, left_atlas, right_atlas):
+        values = np.empty((len(self.base.indices), 3), np.float32)
+        for mask, atlas in ((self.eye_mask, left_atlas), (~self.eye_mask, right_atlas)):
+            sampled = atlas.reshape(-1, 3)[self.base.indices[mask]].astype(np.float32)
+            values[mask] = np.sum(sampled * self.base.weights[None, :, None], axis=1) / 255.0
+        return values
+
+    def preview(self, left_atlas, right_atlas):
+        left = self.base.preview(left_atlas)
+        right = self.base.preview(right_atlas)
+        output = np.zeros_like(left)
+        output[:, :128] = left[:, :128]
+        output[:, 128:] = right[:, 128:]
+        return output
+
+
 @dataclass
 class AppliedControl:
     throttle: float
@@ -82,7 +104,12 @@ class World:
         self.lock = threading.RLock()
         self.model = FlyModel(FLY_DIR / ".cache" / "malecns")
         self.neuron_groups = self._load_neuron_groups()
+        self.base_retina = self.model.retina
+        eye_mask = self.model.visual_pixels[:, 1] < 32
+        self.model.retina = StereoRetina(self.base_retina, eye_mask)
         self.frame = np.zeros((HEIGHT, WIDTH, 3), np.uint8)
+        self.left_atlas = self.frame.copy()
+        self.right_atlas = self.frame.copy()
         self.paused = False
         self.flight_enabled = True
         self.neural_escape_enabled = True
@@ -161,8 +188,9 @@ class World:
             if bearing < .95: nearest = min(nearest, max(.1, distance))
         return max(0.0, min(1.0, (5.0 - nearest) / 4.0))
 
-    def render_camera(self) -> tuple[np.ndarray, int]:
+    def render_camera(self, ox=None, oy=None) -> tuple[np.ndarray, int]:
         """Render room walls, floor and furniture into a six-face camera atlas."""
+        ox, oy = (self.x, self.y) if ox is None or oy is None else (ox, oy)
         atlas = np.empty((HEIGHT, WIDTH, 3), np.uint8)
         face_angles = [0.0, math.pi / 2, math.pi, -math.pi / 2]
         visible = set()
@@ -188,19 +216,19 @@ class World:
                 hits = []
                 if abs(dx) > 1e-5:
                     for b in (-ROOM_HALF, ROOM_HALF):
-                        dist = (b - self.x) / dx
-                        if dist > 0 and -ROOM_HALF <= self.y + dy * dist <= ROOM_HALF: hits.append(dist)
+                        dist = (b - ox) / dx
+                        if dist > 0 and -ROOM_HALF <= oy + dy * dist <= ROOM_HALF: hits.append(dist)
                 if abs(dy) > 1e-5:
                     for b in (-ROOM_HALF, ROOM_HALF):
-                        dist = (b - self.y) / dy
-                        if dist > 0 and -ROOM_HALF <= self.x + dx * dist <= ROOM_HALF: hits.append(dist)
+                        dist = (b - oy) / dy
+                        if dist > 0 and -ROOM_HALF <= ox + dx * dist <= ROOM_HALF: hits.append(dist)
                 wall_distance = min(hits) if hits else 30
                 top = max(2, int(horizon - 110 / max(wall_distance, 2)))
                 image[top:106] = [132, 145, 160]
                 image[104:108] = [63, 72, 82]
                 # Project furniture into this 90-degree cube face.
                 for n, item in enumerate(OBJECTS):
-                    rx, ry = item["x"] - self.x, item["y"] - self.y
+                    rx, ry = item["x"] - ox, item["y"] - oy
                     distance = math.hypot(rx, ry)
                     bearing = wrap_angle(math.atan2(ry, rx) - angle)
                     if distance < 22 and abs(bearing) < math.pi / 4:
@@ -221,7 +249,16 @@ class World:
     def tick(self):
         with self.lock:
             if self.paused: return
-            self.frame, visible_objects = self.render_camera()
+            eye_offset = .42
+            left_ox = self.x - math.sin(self.heading) * eye_offset
+            left_oy = self.y + math.cos(self.heading) * eye_offset
+            right_ox = self.x + math.sin(self.heading) * eye_offset
+            right_oy = self.y - math.cos(self.heading) * eye_offset
+            left_atlas, left_visible = self.render_camera(left_ox, left_oy)
+            right_atlas, right_visible = self.render_camera(right_ox, right_oy)
+            self.left_atlas, self.right_atlas = left_atlas, right_atlas
+            self.frame = ((left_atlas.astype(np.uint16) + right_atlas.astype(np.uint16)) // 2).astype(np.uint8)
+            visible_objects = max(left_visible, right_visible)
             # Interactive, explicitly labeled optogenetic-style test pulse.
             for name, ticks in list(self.stimulus_ticks.items()):
                 if ticks > 0:
@@ -229,7 +266,21 @@ class World:
                     self.stimulus_ticks[name] = ticks - 1
                 else:
                     del self.stimulus_ticks[name]
-            brain, spikes = self.model.step(self.frame, self.model.step_count * self.model.dt)
+            sensory_rgb = self.model.retina.sample(left_atlas, right_atlas)
+            lum = sensory_rgb @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+            prev_lum = self.model.previous_rgb @ np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+            temporal = np.abs(lum - prev_lum)
+            color = np.maximum(sensory_rgb[:, 1] - .5 * (sensory_rgb[:, 0] + sensory_rgb[:, 2]), 0)
+            sensory = np.clip(.45 * lum + 1.6 * temporal + .25 * color, 0, 1)
+            self.model.previous_rgb = sensory_rgb
+            self.model.mean_luminance = float(lum.mean())
+            self.model.temporal_energy = float(temporal.mean())
+            original_encode = self.model.encode_retina
+            self.model.encode_retina = lambda _rgb: sensory
+            try:
+                brain, spikes = self.model.step(self.frame, self.model.step_count * self.model.dt)
+            finally:
+                self.model.encode_retina = original_encode
             # Motor readout follows the named MaleCNS populations. The
             # model's generic output is retained for comparison, but the car
             # command is derived from DNg100 and bilateral DNa02/DNg13 rates.
@@ -392,7 +443,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/state": return self.send_bytes(json.dumps(WORLD.state()).encode(), "application/json")
         if self.path == "/vision":
-            with WORLD.lock: body = WORLD.model.retina.preview(WORLD.frame).tobytes()
+            with WORLD.lock: body = WORLD.model.retina.preview(WORLD.left_atlas, WORLD.right_atlas).tobytes()
             return self.send_bytes(body, "application/octet-stream")
         if self.path == "/camera":
             with WORLD.lock: body = WORLD.frame.tobytes()
