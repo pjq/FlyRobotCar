@@ -2,6 +2,8 @@
 
 A true WebGL 3D room explored by a robot car using the MaleCNS fruit-fly model. It is both a runnable demonstration and a reference implementation for connecting MaleCNS to another simulated or physical environment.
 
+This project is adapted from the upstream [Fly64](https://github.com/ornata/fly) experiment, which connects the MaleCNS model to Super Mario 64. FlyBobotCar replaces the game with a standalone room, furniture, vehicle physics, and Three.js viewer.
+
 ![Jianqing's FlyBobotCar dashboard](docs/flyrobotcar.png)
 
 ## Documentation
@@ -10,6 +12,7 @@ A true WebGL 3D room explored by a robot car using the MaleCNS fruit-fly model. 
 - [Build a new MaleCNS environment adapter](docs/BUILDING-NEW-ADAPTER.md)
 - [Coding-agent instructions](AGENTS.md)
 - [OpenCLI/X findings and neuron test plan](docs/TWITTER-FINDINGS.md)
+- [Upstream Fly64 reference](https://github.com/ornata/fly)
 
 ```text
 3D room + furniture → six-face camera → simulated compound eye
