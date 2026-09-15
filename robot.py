@@ -255,7 +255,7 @@ class World:
             if self.flying:
                 # Modeled flight dynamics; neural groups choose takeoff and
                 # flight drive, while gravity/drag are explicit physics.
-                lift = max(-1.0, min(1.0, flight_rate / 50.0 - .25))
+                lift = max(-1.0, min(1.0, flight_rate / 25.0 - .25))
                 self.vertical_speed += (lift * 5.0 - 2.4) * DT
                 self.vertical_speed *= .985
                 self.z += self.vertical_speed * DT
@@ -355,7 +355,7 @@ class Handler(BaseHTTPRequestHandler):
             elif parsed.path == "/neural-escape": WORLD.neural_escape_enabled = not WORLD.neural_escape_enabled
             elif parsed.path == "/flight-test":
                 for name in ("DNp01", "DNp02", "DNp04", "DNp11"):
-                    WORLD.stimulus_ticks[name] = 20
+                    WORLD.stimulus_ticks[name] = 100
                 WORLD.events.append({"time": round(time.time(), 2), "type": "flight-test", "group": "DNp01+DNp02+DNp04+DNp11"})
             elif parsed.path == "/stimulate":
                 name = parse_qs(parsed.query).get("group", [""])[0]
