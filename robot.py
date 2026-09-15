@@ -88,13 +88,20 @@ class World:
         """Resolve named biological cell types to prepared model indices."""
         cache = FLY_DIR / ".cache" / "malecns"
         ids = np.load(cache / "model.npz", allow_pickle=False)["ids"]
-        table = feather.read_table(cache / "raw" / "annotations.feather", columns=["bodyId", "flywireType", "type"]).to_pandas()
+        table = feather.read_table(cache / "raw" / "annotations.feather", columns=["bodyId", "flywireType", "type", "instance", "somaSide"]).to_pandas()
         labels = table["flywireType"].fillna(table["type"]).astype(str)
         index = {int(body): i for i, body in enumerate(ids)}
         groups = {}
         for name in ("LC4", "LPLC2", "DNp01", "DNp10", "DNg100", "DNa02", "DNg13"):
-            bodies = table.loc[labels.eq(name), "bodyId"].astype(int)
+            selected = table.loc[labels.eq(name)].copy()
+            bodies = selected["bodyId"].astype(int)
             groups[name] = np.asarray([index[b] for b in bodies if b in index], dtype=np.int32)
+            instances = selected["instance"].fillna("").astype(str).str.upper()
+            sides = selected["somaSide"].fillna("").astype(str).str.upper()
+            groups[f"{name}_L"] = np.asarray([index[b] for b, side, inst in zip(bodies, sides, instances)
+                                                   if b in index and (side == "L" or "_L" in inst)], dtype=np.int32)
+            groups[f"{name}_R"] = np.asarray([index[b] for b, side, inst in zip(bodies, sides, instances)
+                                                   if b in index and (side == "R" or "_R" in inst)], dtype=np.int32)
         return groups
 
     def group_rate(self, name: str, spikes: np.ndarray) -> float:
@@ -174,16 +181,21 @@ class World:
             if self.paused: return
             self.frame, visible_objects = self.render_camera()
             brain, spikes = self.model.step(self.frame, self.model.step_count * self.model.dt)
-            raw_throttle = max(0.0, brain.y / 70.0)
-            raw_steering = max(-1.0, min(1.0, brain.x / 70.0))
+            # Motor readout follows the named MaleCNS populations. The
+            # model's generic output is retained for comparison, but the car
+            # command is derived from DNg100 and bilateral DNa02/DNg13 rates.
+            dng_rate = self.group_rate("DNg100", spikes)
+            left_turn = self.group_rate("DNa02_L", spikes) + self.group_rate("DNg13_L", spikes)
+            right_turn = self.group_rate("DNa02_R", spikes) + self.group_rate("DNg13_R", spikes)
+            raw_throttle = max(0.0, min(1.0, dng_rate / 50.0))
+            raw_steering = max(-1.0, min(1.0, (right_turn - left_turn) / 50.0))
             # Neural-only escape experiment: geometry is not consulted for
             # steering. We only read the named MaleCNS populations after the
             # complete network has propagated the visual input.
             lc4_rate = self.group_rate("LC4", spikes)
             lplc2_rate = self.group_rate("LPLC2", spikes)
             dnp_rate = self.group_rate("DNp01", spikes) + self.group_rate("DNp10", spikes)
-            dng_rate = self.group_rate("DNg100", spikes)
-            dna_rate = self.group_rate("DNa02", spikes) + self.group_rate("DNg13", spikes)
+            dna_rate = left_turn + right_turn
             control = AppliedControl(raw_throttle, raw_steering)
             source = "MaleCNS"
             if self.neural_escape_enabled and self.escape_ticks > 0:
@@ -193,7 +205,7 @@ class World:
             elif self.neural_escape_enabled and (lc4_rate + lplc2_rate) > 8.0 and dnp_rate > 8.0:
                 # The escape command comes from DNp01/DNp10. Direction comes
                 # only from the neural steering readout, never room coordinates.
-                control = AppliedControl(max(raw_throttle * .45, .18), raw_steering if abs(raw_steering) > .08 else .55)
+                control = AppliedControl(raw_throttle * .45, raw_steering)
                 source = "MaleCNS neural escape"
             target_speed = control.throttle * MAX_SPEED
             self.speed += (target_speed - self.speed) * .12
@@ -244,6 +256,9 @@ class World:
                 "lc4_rate": round(lc4_rate, 2), "lplc2_rate": round(lplc2_rate, 2),
                 "dnp01_rate": round(self.group_rate("DNp01", spikes), 2), "dnp10_rate": round(self.group_rate("DNp10", spikes), 2),
                 "dng100_rate": round(dng_rate, 2), "dna_rate": round(dna_rate, 2),
+                "dng100_l_rate": round(self.group_rate("DNg100_L", spikes), 2), "dng100_r_rate": round(self.group_rate("DNg100_R", spikes), 2),
+                "dna02_l_rate": round(self.group_rate("DNa02_L", spikes), 2), "dng13_l_rate": round(self.group_rate("DNg13_L", spikes), 2),
+                "dna02_r_rate": round(self.group_rate("DNa02_R", spikes), 2), "dng13_r_rate": round(self.group_rate("DNg13_R", spikes), 2),
                 "assist": source != "MaleCNS", "safe_mode": False,
                 "distance": round(self.distance, 2), "collisions": self.collisions,
                 "wall_collisions": self.wall_collisions, "last_contact": self.last_contact,

@@ -12,6 +12,7 @@ This project is adapted from the upstream [Fly64](https://github.com/ornata/fly)
 - [Build a new MaleCNS environment adapter](docs/BUILDING-NEW-ADAPTER.md)
 - [Coding-agent instructions](AGENTS.md)
 - [OpenCLI/X findings and neuron test plan](docs/TWITTER-FINDINGS.md)
+- [Neuron findings used by FlyBobotCar](docs/NEURON-FINDINGS.md)
 - [Upstream Fly64 reference](https://github.com/ornata/fly)
 
 ```text
