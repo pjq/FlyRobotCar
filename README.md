@@ -2,6 +2,8 @@
 
 A true WebGL 3D room explored by a robot car using the MaleCNS fruit-fly model.
 
+![SuccessFactors Mobile FlyRobotCar dashboard](docs/flyrobotcar.png)
+
 ```text
 3D room + furniture → six-face camera → simulated compound eye
 → 166,700-neuron MaleCNS → motor readout + optional fly-style reflexes
