@@ -370,6 +370,9 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == "/vision":
             with WORLD.lock: body = WORLD.model.retina.preview(WORLD.frame).tobytes()
             return self.send_bytes(body, "application/octet-stream")
+        if self.path == "/camera":
+            with WORLD.lock: body = WORLD.frame.tobytes()
+            return self.send_bytes(body, "application/octet-stream")
         if self.path == "/objects": return self.send_bytes(json.dumps(OBJECTS).encode(), "application/json")
         return self.send_bytes((ROOT / "index.html").read_bytes(), "text/html; charset=utf-8")
 
