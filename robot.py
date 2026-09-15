@@ -31,11 +31,14 @@ OBJECTS = [
     {"kind": "bookshelf", "x": 10.8, "y": -4.2, "w": 1.4, "d": 5.0, "h": 3.2, "color": [101, 67, 43]},
     {"kind": "armchair", "x": -8.0, "y": -5.5, "w": 2.2, "d": 2.2, "h": 1.7, "color": [178, 83, 66]},
     {"kind": "plant", "x": 6.8, "y": -7.5, "w": 1.5, "d": 1.5, "h": 2.4, "color": [46, 135, 70]},
-    # Sofa Road: a visible corridor, not a hidden navigation constraint.
-    {"kind": "sofa", "x": -4.4, "y": -7.0, "w": 2.0, "d": 3.0, "h": 1.5, "color": [49, 112, 165]},
-    {"kind": "sofa", "x": 4.4, "y": -7.0, "w": 2.0, "d": 3.0, "h": 1.5, "color": [49, 112, 165]},
-    {"kind": "sofa", "x": -4.4, "y": -2.5, "w": 2.0, "d": 3.0, "h": 1.5, "color": [49, 112, 165]},
-    {"kind": "sofa", "x": 4.4, "y": -2.5, "w": 2.0, "d": 3.0, "h": 1.5, "color": [49, 112, 165]},
+    # Box Road: repeated blocks create a visible S/slalom challenge.
+    {"kind": "box", "x": -3.8, "y": -7.5, "w": 2.4, "d": 2.0, "h": 2.0, "color": [43, 112, 185]},
+    {"kind": "box", "x": 3.8, "y": -5.0, "w": 2.4, "d": 2.0, "h": 2.0, "color": [43, 112, 185]},
+    {"kind": "box", "x": -3.8, "y": -2.5, "w": 2.4, "d": 2.0, "h": 2.0, "color": [43, 112, 185]},
+    {"kind": "box", "x": 3.8, "y": 0.0, "w": 2.4, "d": 2.0, "h": 2.0, "color": [43, 112, 185]},
+    {"kind": "box", "x": -3.8, "y": 2.5, "w": 2.4, "d": 2.0, "h": 2.0, "color": [43, 112, 185]},
+    {"kind": "box", "x": 3.8, "y": 5.0, "w": 2.4, "d": 2.0, "h": 2.0, "color": [43, 112, 185]},
+    {"kind": "box", "x": -3.8, "y": 7.5, "w": 2.4, "d": 2.0, "h": 2.0, "color": [43, 112, 185]},
 ]
 
 
@@ -71,7 +74,7 @@ class World:
         self.x, self.y, self.heading = 0.0, -9.5, math.pi / 2
         self.speed = self.distance = 0.0
         self.collisions = self.wall_collisions = 0
-        self.sofa_successes = 0
+        self.box_successes = 0
         self.last_collision_step = -100
         self.last_contact = "none"
         self.escape_ticks = 0
@@ -225,7 +228,7 @@ class World:
                 # Evaluation only: crossing the marked Sofa Road finish line
                 # counts success; it never changes steering or throttle.
                 if previous_y < 10.0 <= self.y and abs(self.x) < 3.0:
-                    self.sofa_successes += 1
+                    self.box_successes += 1
                     self.x, self.y, self.heading = 0.0, -9.5, math.pi / 2
                     self.speed = 0.0
 
@@ -242,7 +245,7 @@ class World:
                 "distance": round(self.distance, 2), "collisions": self.collisions,
                 "wall_collisions": self.wall_collisions, "last_contact": self.last_contact,
                 "visible_objects": visible_objects, "object_count": len(OBJECTS),
-                "sofa_successes": self.sofa_successes,
+                "box_successes": self.box_successes,
                 "spikes": int(len(spikes)), "step": self.model.step_count, "paused": self.paused,
                 "neurons": self.model.n, "edges": int(self.model.w.nnz),
             }
