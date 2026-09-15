@@ -94,6 +94,9 @@ class World:
         self.x, self.y, self.heading = -10.0, -18.0, 0.0
         self.z = self.vertical_speed = 0.0
         self.flying = False
+        self.landing = False
+        self.flight_ticks = 0
+        self.flight_cooldown = 0
         self.ceiling_contacts = 0
         self.flight_candidate_ticks = 0
         self.neural_loom_memory = 0.0
@@ -257,8 +260,11 @@ class World:
                 self.flight_candidate_ticks += 1
             else:
                 self.flight_candidate_ticks = max(0, self.flight_candidate_ticks - 1)
-            if self.flight_enabled and not self.flying and self.flight_candidate_ticks >= 3:
+            self.flight_cooldown = max(0, self.flight_cooldown - 1)
+            if self.flight_enabled and not self.flying and self.flight_cooldown == 0 and self.flight_candidate_ticks >= 3:
                 self.flying = True
+                self.landing = False
+                self.flight_ticks = 300  # maximum 6 seconds before a neural landing check
                 self.z = max(self.z, .3)
                 self.auto_takeoffs += 1
                 self.flight_candidate_ticks = 0
@@ -273,10 +279,17 @@ class World:
                 control = AppliedControl(raw_throttle * .45, raw_steering)
                 source = "MaleCNS neural escape"
             target_speed = control.throttle * MAX_SPEED
-            if self.flying:
+            if self.flying or self.landing:
                 # Modeled flight dynamics; neural groups choose takeoff and
                 # flight drive, while gravity/drag are explicit physics.
-                lift = max(-1.0, min(1.0, self.neural_flight_memory / 10.0 - .2))
+                self.flight_ticks = max(0, self.flight_ticks - 1)
+                if self.flying and self.flight_ticks == 0:
+                    self.flying = False
+                    self.landing = True
+                    self.flight_cooldown = 250
+                    self.neural_loom_memory = self.neural_escape_memory = self.neural_flight_memory = 0.0
+                    self.flight_candidate_ticks = 0
+                lift = max(-1.0, min(1.0, self.neural_flight_memory / 10.0 - .2)) if self.flying else -1.0
                 self.vertical_speed += (lift * 5.0 - 2.4) * DT
                 self.vertical_speed *= .985
                 self.z += self.vertical_speed * DT
@@ -288,6 +301,7 @@ class World:
                     self.z = 0.0
                     self.vertical_speed = 0.0
                     self.flying = False
+                    self.landing = False
             self.speed += (target_speed - self.speed) * .12
             if self.speed < .08: self.speed = 0.0
             turn_rate = self.speed * .34
@@ -328,7 +342,7 @@ class World:
                     self.speed = 0.0
 
             self.last = {
-                "x": round(self.x, 3), "y": round(self.y, 3), "z": round(self.z, 3), "flying": self.flying, "auto_takeoffs": self.auto_takeoffs, "ceiling_contacts": self.ceiling_contacts, "heading": round(self.heading, 4),
+                "x": round(self.x, 3), "y": round(self.y, 3), "z": round(self.z, 3), "flying": self.flying, "landing": self.landing, "flight_ticks": self.flight_ticks, "flight_cooldown": self.flight_cooldown, "auto_takeoffs": self.auto_takeoffs, "ceiling_contacts": self.ceiling_contacts, "heading": round(self.heading, 4),
                 "neural_loom_memory": round(self.neural_loom_memory, 2), "neural_escape_memory": round(self.neural_escape_memory, 2), "neural_flight_memory": round(self.neural_flight_memory, 2),
                 "speed": round(self.speed, 2), "raw_throttle": brain.y, "raw_steering": brain.x,
                 "throttle": round(control.throttle * 70), "steering": round(control.steering * 70),
