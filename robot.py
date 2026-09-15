@@ -248,5 +248,5 @@ def loop():
 
 if __name__ == "__main__":
     threading.Thread(target=loop, daemon=True).start()
-    print(f"FlyRobotCar: http://127.0.0.1:{PORT}/", flush=True)
+    print(f"Jianqing's FlyBobotCar: http://127.0.0.1:{PORT}/", flush=True)
     ThreadingHTTPServer(("127.0.0.1", PORT), Handler).serve_forever()

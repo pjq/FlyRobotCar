@@ -1,8 +1,8 @@
-# SuccessFactors Mobile FlyRobotCar
+# Jianqing's FlyBobotCar
 
 A true WebGL 3D room explored by a robot car using the MaleCNS fruit-fly model.
 
-![SuccessFactors Mobile FlyRobotCar dashboard](docs/flyrobotcar.png)
+![Jianqing's FlyBobotCar dashboard](docs/flyrobotcar.png)
 
 ```text
 3D room + furniture → six-face camera → simulated compound eye
@@ -32,7 +32,7 @@ Open <http://127.0.0.1:8775/>.
 
 ## Room
 
-The bounded room contains physical walls, a sofa, coffee table, dining table, bookshelf, armchair, plant, tiled floor, and a `SuccessFactors Mobile FlyRobotCar` wall sign. The backend physics, fly-camera rendering, and Three.js scene use the same object layout.
+The bounded room contains physical walls, a sofa, coffee table, dining table, bookshelf, armchair, plant, tiled floor, and a `Jianqing's FlyBobotCar` wall sign. The backend physics, fly-camera rendering, and Three.js scene use the same object layout.
 
 ## Controls
 
